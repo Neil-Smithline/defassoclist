@@ -33,6 +33,8 @@
 ;; keyword arguments INITVALUE and DOCSTRING. (See `defvar' for more
 ;; information.)
 ;;
+;; See note about idempotency at the end of the commentary.
+;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; DEFINED FUNCTION DOCUMENTATION
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -110,8 +112,14 @@
 ;; :INITVALUE
 ;;
 ;;      An optional value that will be passed to `defvar' during the
-;;      creation of the assoc list. See `defvar' for details about how
-;;      :INITVALUE behaves.
+;;      creation of the assoc list. See `defvar' and the :FORCEINIT
+;;      keyword for details about how :INITVALUE behaves.
+;;
+;; :FORCEINIT
+;;
+;;      When :FORCEINIT is non-null, after calling `defvar' to define
+;;      SYMBOL, `defassoclist' will use `setq' to set SYMOBL to
+;;      :INITVALUE, erasing any existing value of SYMBOL.
 ;;
 ;; :CONSP
 ;;
@@ -170,43 +178,101 @@
 ;; Detailed explanation of the argument values for
 ;;     `defassoclist' when used on `minor-mode-alist':
 ;;
-;;     SYMBOL          The assoc list's symbol: minor-mode-alist
+;;      SYMBOL          The assoc list's symbol: minor-mode-alist
 ;;
-;;     TEST            The default value of `equal' will work but, being
+;;      TEST            The default value of `equal' will work but, being
 ;;                     that the `car's of the items in the list are all symbols,
 ;;                     it is more efficient to use `eq'.
 ;;
-;;     TEST-NOT        The default value of null is almost always correct.
+;;      TEST-NOT        The default value of null is almost always correct.
 ;;
-;;     KEY             The default value of null is almost always correct.
+;;      KEY             The default value of null is almost always correct.
 ;;
-;;     RTEST           Being that the second element of `minor-mode-alist'
+;;      RTEST           Being that the second element of `minor-mode-alist'
 ;;                     can be strings as well as other types, the
 ;;                     default value of `equal' is appropriate.
 ;;
-;;     RTEST-NOT       The default value of null is almost always correct.
+;;      RTEST-NOT       The default value of null is almost always correct.
 ;;
-;;     RKEY            The default value of null is almost always correct.
+;;      RKEY            The default value of null is almost always correct.
 ;;
-;;     INITVALUE       As `minor-mode-alist' is already defined, this
-;;                     will have no effect since `defvar' does not redefine
-;;                     a variable. Except when defining a new assoc list,
-;;                     the default value of null is likely correct.
+;;      INITVALUE       As `minor-mode-alist' is already defined, this
+;;                     will have no effect since `defvar' does not
+;;                     redefine a variable. Except when defining a new
+;;                     assoc list, or :FORCEINIT is non-null. As
+;;                     `minor-mode-alist' likely has a pre-existing
+;;                     value that we want to keep, :INITVALUE won't be
+;;                     used leaving.
 ;;
-;;     DOCSTRING       As `minor-mode-alist' is already documented and we
+;;      FORCEINIT       In order to retain the existing value of
+;;                     `minor-mode-alist', we will leave this as null.
+;;
+;;
+;;      DOCSTRING       As `minor-mode-alist' is already documented and we
 ;;                     do not wish to change the document string, we use the
 ;;                     default value of null.
 ;;
-;;     CONSP           As `minor-mode-alist' expects its entries to be lists,
+;;      CONSP           As `minor-mode-alist' expects its entries to be lists,
 ;;                     (ie: it is a `list' type of assoc list) the default
 ;;                     value of null is appropriate. 
 ;; 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; 
+;; It should be noted that it is safe to use `defassoclist' to declare
+;; the same SYMBOL as an assoc list multiple times. `defassoclist' is
+;; idempotent provided you do not use the :DOCSTRING, :INITVALUE, and
+;; :FORCEINIT keywords.
+;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; IDEMPOTENCY (ie: repeated uses of `defassoclist' on the same symbol)
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; Using `defassoclist' multiple times on SYMBOL is always safe if you
+;; provide no keys to the `defassoclist' calls. Including non-default
+;; values for the keys can affect the assoc list and its functions as
+;; follows:
+;;
+;;     TEST, TEST-NOT, KEY, RTEST, RTEST-NOT, RKEY
+;;
+;;          Changing the value of any of these keys will dramatically
+;;          affect the behavior of the generated functions. In
+;;          general, just don't.
+;;
+;;     CONSP
+;;
+;;          In almost all circumstances, change the value of CONSP in
+;;          `defassoclist' will lead to problems. The most obvious
+;;          execption is if the `defassoclist' passes a non-null value
+;;          for FORCEINIT.
+;;
+;;      DOCSTRING
+;;
+;;          When there are multiple `defassoclist' declarations for
+;;          the same SYMBOL, the documentation for SYMBOL will be the
+;;          value of the most recent non-null DOCSTRING value. That
+;;          is, different DOCSTRING values will change SYMBOL's
+;;          documentation.
+;;
+;;      INITVALUE
+;;
+;;          Being that INITVALUE will not change the value of SYMBOL
+;;          if it has one, multiple `defassoclist' declarations with
+;;          one or more INITVALUE values works. The only caveat is
+;;          that if you are passing different values to the INITVALUE
+;;          keyword, only the first will have an affect (see `defvar'
+;;          for details).
+;;
+;;      FORCEINIT
+;;
+;;          When `defassoclist' is passed a non-null FORCEINIT value,
+;;          `defassoclist' behaves as a `setq' has been called on
+;;          SYMBOL, assigning it INITVALUE. As long as you remember
+;;          that a non-null FORCEINIT is equivalent to a `setq', using
+;;          this is safe.
+;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
 ;;; Change Log:
 ;; 
-;; 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; 
 ;; This program is free software; you can redistribute it and/or
 ;; modify it under the terms of the GNU General Public License as
@@ -223,7 +289,7 @@
 ;; the Free Software Foundation, Inc., 51 Franklin Street, Fifth
 ;; Floor, Boston, MA 02110-1301, USA.
 ;; 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; 
 ;;; Code:
 (require 'defhook)
@@ -231,7 +297,7 @@
 (defmacro* defassoclist (symbol &key
                                 (test #'equal) test-not key
                                 (rtest #'equal) rtest-not rkey
-                                initvalue docstring
+                                initvalue forceinit docstring
                                 (consp nil))
   "Create assoc list helper functions for SYMBOL.
 SYMBOL will be defined with `defvar' and passed the values of the
@@ -253,6 +319,7 @@ argument for more details."
          (my-rkey               rkey)
          (my-docstring          docstring)
          (my-initvalue          initvalue)
+         (my-forceinit          forceinit)
          (commentary-doc        (concat
                                  "\n\nUse the \\[finder-commentary] command "
                                  "with `defassoclist' as the\n"
@@ -274,8 +341,13 @@ argument for more details."
 
     `(progn
        ;; ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+       ;; Create the list with defvar
+       ;; ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
        (defvar ,my-symbol ,my-initvalue ,my-docstring)
+       (when ,my-forceinit (setq ,my-symbol ,my-initvalue))
 
+       ;; ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+       ;; Accessors
        ;; ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
        (defun ,assoc-sym (key)                         
          ,(format "Execute `assoc*' on `%s' with KEY.%s" 
@@ -293,6 +365,8 @@ argument for more details."
          (rassoc* value ,my-symbol
                   :key #',my-rkey :test #',my-rtest :test-not #',my-rtest-not))
 
+       ;; ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+       ;; Removers
        ;; ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
        (defun ,remove-sym (key)
          ,(format "Non-destructively remove all entries matching KEY in `%s'.%s"
@@ -330,6 +404,8 @@ argument for more details."
              (setq ,my-symbol (delete match ,my-symbol))))
          ,my-symbol)
 
+       ;; ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+       ;; Mutators
        ;; ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
        (defun ,set-sym (key &rest values)
          ,(format
